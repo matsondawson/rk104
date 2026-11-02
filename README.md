@@ -5,6 +5,8 @@ live/real-time colours and key remapping. Ragnok ships Windows-only software.
 The protocol was reverse engineered from that software and is documented in
 [PROTOCOL.md](PROTOCOL.md).
 
+![RK104 GUI](screenshot.png)
+
 Supported: wired USB mode (`0c45:8006`). The 2.4G dongle (`05ac:024f`) uses a
 different transport that is only partly documented.
 
