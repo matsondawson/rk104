@@ -10,7 +10,14 @@ different transport that is only partly documented.
 
 ## Setup
 
-Allow your user to access the keyboard's hidraw device:
+### 1. USB permissions
+
+The tools talk to the keyboard through `/dev/hidraw*`. On most distros that
+device is readable only by root, so add a udev rule that gives your user
+access. Do not run the GUI as root.
+
+**systemd distros** (Arch/CachyOS/Manjaro, Fedora, Ubuntu/Debian/Mint/Pop!_OS,
+openSUSE, ...): grant access to whoever is logged in at the seat:
 
 ```sh
 echo 'KERNEL=="hidraw*", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="8006", MODE="0660", TAG+="uaccess"' \
@@ -18,8 +25,53 @@ echo 'KERNEL=="hidraw*", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="8006", MODE
 sudo udevadm control --reload && sudo udevadm trigger
 ```
 
-Replug the keyboard afterwards. The GUI needs PySide6 (`pacman -S pyside6` or
-`pip install PySide6`). The CLI uses only the Python standard library.
+The file name must sort before `73-seat-late.rules` for `uaccess` to apply,
+which is why it starts with `70-`.
+
+**Without systemd-logind** (Void, Alpine, Gentoo/OpenRC, Artix, Devuan, or SSH
+sessions): `uaccess` does nothing there, so use a group instead:
+
+```sh
+sudo groupadd -f rk104
+sudo usermod -aG rk104 "$USER"
+echo 'KERNEL=="hidraw*", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="8006", MODE="0660", GROUP="rk104"' \
+  | sudo tee /etc/udev/rules.d/70-rk104.rules
+sudo udevadm control --reload && sudo udevadm trigger   # Alpine/mdev: replug or reboot
+```
+
+Log out and back in so the new group takes effect. (On Alpine with mdev
+rather than eudev, add an equivalent mdev rule instead.)
+
+**NixOS**, in `configuration.nix`:
+
+```nix
+services.udev.extraRules = ''
+  KERNEL=="hidraw*", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="8006", MODE="0660", TAG+="uaccess"
+'';
+```
+
+Then run `sudo nixos-rebuild switch`.
+
+**Check that it worked:** unplug and replug the keyboard, then run:
+
+```sh
+python3 rk104.py direct all=00ff00   # whole board should turn green
+```
+
+If it says `no permission for /dev/hidrawN`, compare against
+`ls -l /dev/hidraw*` and `getfacl /dev/hidrawN`. Your user should appear in
+the ACL (uaccess) or the group (group method).
+
+### 2. Python
+
+The CLI uses only the Python 3 standard library. The GUI also needs PySide6:
+
+| distro | command |
+|---|---|
+| Arch / CachyOS / Manjaro | `sudo pacman -S pyside6` |
+| Fedora | `sudo dnf install python3-pyside6` |
+| Debian 13+ / Ubuntu 24.10+ | `sudo apt install python3-pyside6.qtwidgets` |
+| anything else | `python3 -m venv .venv && .venv/bin/pip install PySide6`, then run with `.venv/bin/python` |
 
 ## GUI
 
