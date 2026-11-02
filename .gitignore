@@ -1,0 +1,8 @@
+# Vendor installer and assets (not redistributable)
+*.zip
+*.exe
+assets/
+extracted/config.xml
+
+__pycache__/
+*.pyc
