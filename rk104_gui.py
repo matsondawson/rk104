@@ -367,7 +367,7 @@ class SetupDialog(QDialog):
 
 # ---------------------------------------------------------------- main window
 class MainWindow(QMainWindow):
-    def __init__(self, dry_run=False):
+    def __init__(self, dry_run=False, detect_delay=0):
         super().__init__()
         self.setWindowTitle("RK104 Lighting")
         self.worker = DeviceWorker(rk104.RK104(dry_run))
@@ -377,7 +377,8 @@ class MainWindow(QMainWindow):
         self.worker.start()
         self.setup_dlg = SetupDialog(self, self.worker.dev)
         if not dry_run:
-            QTimer.singleShot(0, self._check_device)
+            self._countdown = detect_delay
+            QTimer.singleShot(0, self._tick_detect)
 
         self.kb = KeyboardView(rk104.load_layout())
         self.kb.changed.connect(self._on_colors_changed)
@@ -664,6 +665,16 @@ class MainWindow(QMainWindow):
     def _on_selection(self):
         self.sel_label.setText("%d selected" % len(self.kb.selected))
 
+    def _tick_detect(self):
+        # Optional startup delay (--detect-delay N) so you can unplug the
+        # keyboard to see the setup help.
+        if self._countdown > 0:
+            self.statusBar().showMessage("Checking for keyboard in %d s…" % self._countdown)
+            self._countdown -= 1
+            QTimer.singleShot(1000, self._tick_detect)
+        else:
+            self._check_device()
+
     def _check_device(self):
         try:
             with self.worker.dev.lock:
@@ -704,7 +715,13 @@ def main():
     rules = os.environ.get("QT_LOGGING_RULES", "")
     os.environ["QT_LOGGING_RULES"] = ";".join(filter(None, [rules, "qt.qpa.wayland.textinput=false"]))
     app = QApplication(sys.argv)
-    w = MainWindow(dry_run="--dry-run" in sys.argv)
+    import argparse
+    ap = argparse.ArgumentParser(description="RK104 lighting / key mapping GUI")
+    ap.add_argument("--dry-run", action="store_true", help="print packets instead of sending")
+    ap.add_argument("--detect-delay", type=int, default=0, metavar="SECONDS",
+                    help="wait before checking for the keyboard (to test setup help)")
+    args, _ = ap.parse_known_args()
+    w = MainWindow(dry_run=args.dry_run, detect_delay=args.detect_delay)
     w.resize(1000, 640)
     w.show()
     sys.exit(app.exec())
