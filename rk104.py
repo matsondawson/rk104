@@ -29,6 +29,32 @@ class DeviceError(Exception):
     pass
 
 
+class DeviceNotFound(DeviceError):
+    """No wired RK104 config interface present."""
+
+
+class DevicePermission(DeviceError):
+    """Interface present but not openable by this user."""
+
+    def __init__(self, msg, path):
+        super().__init__(msg)
+        self.path = path
+
+
+DONGLE = (0x05AC, 0x024F)
+
+
+def present_ids():
+    """Set of (vid, pid) for all hidraw devices currently present."""
+    ids = set()
+    for h in glob.glob("/sys/class/hidraw/hidraw*"):
+        m = re.search(r"([0-9A-F]{4}):([0-9A-F]{4})\.",
+                      os.path.basename(os.path.realpath(os.path.join(h, "device"))))
+        if m:
+            ids.add((int(m[1], 16), int(m[2], 16)))
+    return ids
+
+
 def _ioc(d, nr, size):
     return (d << 30) | (size << 16) | (ord("H") << 8) | nr
 
@@ -46,7 +72,7 @@ def find_hidraw():
         iface = os.path.basename(os.path.dirname(dev))  # e.g. 1-2:1.2
         if iface.endswith(".%d" % IFACE):
             return "/dev/" + os.path.basename(h)
-    raise DeviceError("RK104 (wired, 0c45:8006) not found")
+    raise DeviceNotFound("RK104 (wired, 0c45:8006) not found")
 
 
 @dataclass
@@ -88,7 +114,7 @@ class RK104:
         try:
             self.fd = os.open(path, os.O_RDWR)
         except PermissionError as e:
-            raise DeviceError("no permission for %s (install the udev rule)" % path) from e
+            raise DevicePermission("no permission for %s (install the udev rule)" % path, path) from e
 
     def close(self):
         if self.fd is not None:

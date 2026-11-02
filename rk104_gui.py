@@ -2,9 +2,10 @@
 """PySide6 lighting editor for the RAGNOK RK104 (wired). See PROTOCOL.md."""
 import json, os, queue, sys
 
-from PySide6.QtCore import QObject, QPointF, QRect, QRectF, QSize, Qt, QThread, Signal
-from PySide6.QtGui import QAction, QColor, QPainter, QPen
-from PySide6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox, QFileDialog,
+from PySide6.QtCore import QObject, QPointF, QRect, QRectF, QSize, Qt, QThread, QTimer, Signal
+from PySide6.QtGui import QAction, QColor, QFontDatabase, QGuiApplication, QPainter, QPen
+from PySide6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox, QDialog,
+                               QDialogButtonBox, QFileDialog, QPlainTextEdit,
                                QFormLayout, QGridLayout, QHBoxLayout, QLabel, QMainWindow,
                                QMessageBox, QPushButton, QSizePolicy, QSlider, QStackedWidget,
                                QTabWidget,
@@ -12,6 +13,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox,
 
 import rk104
 import rk104_keys as rkeys
+import rk104_setup
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Layout coordinate space (from the vendor XML), cropped to the key area.
@@ -45,6 +47,7 @@ class DeviceWorker(QThread):
     """
     status = Signal(str)
     failed = Signal(str)
+    problem = Signal(object)  # DeviceNotFound / DevicePermission -> setup help
 
     def __init__(self, dev):
         super().__init__()
@@ -80,6 +83,8 @@ class DeviceWorker(QThread):
                 self.status.emit(label + ": OK")
             except rk104.DeviceError as e:
                 self.failed.emit("%s: %s" % (label, e))
+                if isinstance(e, (rk104.DeviceNotFound, rk104.DevicePermission)):
+                    self.problem.emit(e)
             except Exception as e:  # keep the worker alive
                 self.failed.emit("%s: unexpected error %r" % (label, e))
 
@@ -309,6 +314,57 @@ def slider(lo, hi, val):
     return s
 
 
+# ---------------------------------------------------------------- setup help
+class SetupDialog(QDialog):
+    """Explains why the keyboard can't be reached and shows the fix for this distro."""
+
+    def __init__(self, parent, dev):
+        super().__init__(parent)
+        self.dev = dev
+        self.setWindowTitle("RK104 setup")
+        self.setMinimumWidth(620)
+        lay = QVBoxLayout(self)
+        self.text = QLabel()
+        self.text.setWordWrap(True)
+        self.text.setTextFormat(Qt.RichText)
+        self.cmd = QPlainTextEdit()
+        self.cmd.setReadOnly(True)
+        self.cmd.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self.cmd.setMaximumHeight(110)
+        self.cmd.setLineWrapMode(QPlainTextEdit.NoWrap)
+        lay.addWidget(self.text)
+        lay.addWidget(self.cmd)
+        bb = QDialogButtonBox()
+        self.copy_btn = bb.addButton("Copy command", QDialogButtonBox.ActionRole)
+        retry = bb.addButton("Retry", QDialogButtonBox.AcceptRole)
+        bb.addButton("Close", QDialogButtonBox.RejectRole)
+        self.copy_btn.clicked.connect(
+            lambda: QGuiApplication.clipboard().setText(self.cmd.toPlainText()))
+        retry.clicked.connect(self.retry)
+        bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    def show_error(self, err):
+        a = rk104_setup.diagnose(err)
+        self.setWindowTitle(a.title)
+        self.text.setText("<h3>%s</h3>%s" % (a.title, a.text))
+        self.cmd.setPlainText(a.command)
+        self.cmd.setVisible(bool(a.command))
+        self.copy_btn.setVisible(bool(a.command))
+        self.show()
+        self.raise_()
+
+    def retry(self):
+        try:
+            with self.dev.lock:
+                self.dev.open()
+        except rk104.DeviceError as e:
+            self.show_error(e)
+            return
+        self.parent().statusBar().showMessage("Keyboard connected", 4000)
+        self.accept()
+
+
 # ---------------------------------------------------------------- main window
 class MainWindow(QMainWindow):
     def __init__(self, dry_run=False):
@@ -317,7 +373,11 @@ class MainWindow(QMainWindow):
         self.worker = DeviceWorker(rk104.RK104(dry_run))
         self.worker.status.connect(lambda m: self.statusBar().showMessage(m, 4000))
         self.worker.failed.connect(self._error)
+        self.worker.problem.connect(self._setup_help)
         self.worker.start()
+        self.setup_dlg = SetupDialog(self, self.worker.dev)
+        if not dry_run:
+            QTimer.singleShot(0, self._check_device)
 
         self.kb = KeyboardView(rk104.load_layout())
         self.kb.changed.connect(self._on_colors_changed)
@@ -603,6 +663,17 @@ class MainWindow(QMainWindow):
 
     def _on_selection(self):
         self.sel_label.setText("%d selected" % len(self.kb.selected))
+
+    def _check_device(self):
+        try:
+            with self.worker.dev.lock:
+                self.worker.dev.open()
+            self.statusBar().showMessage("Keyboard connected", 4000)
+        except rk104.DeviceError as e:
+            self._setup_help(e)
+
+    def _setup_help(self, err):
+        self.setup_dlg.show_error(err)
 
     def _error(self, msg):
         self.statusBar().showMessage(msg, 8000)

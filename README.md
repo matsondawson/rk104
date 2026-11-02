@@ -12,6 +12,9 @@ different transport that is only partly documented.
 
 ### 1. USB permissions
 
+If the GUI can't reach the keyboard, it detects your distro and shows the
+command needed, with Copy and Retry buttons. Steps for doing it by hand:
+
 The tools talk to the keyboard through `/dev/hidraw*`. On most distros that
 device is readable only by root, so add a udev rule that gives your user
 access. Do not run the GUI as root.
@@ -108,6 +111,7 @@ Effect numbers: 0 off, 1 Static, 2 SingleOn, 3 SingleOff, 4 Glittering,
 - `rk104.py`: protocol library and CLI
 - `rk104_keys.py`: HID key, mouse and media tables for remapping
 - `rk104_gui.py`: PySide6 GUI
+- `rk104_setup.py`: works out connection problems and the distro-specific fix
 - `extracted/rk104_layout.xml`: key positions and LED/key indices, taken from the vendor software
 - `PROTOCOL.md`: protocol notes
 
