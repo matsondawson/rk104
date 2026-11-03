@@ -118,3 +118,11 @@ Effect numbers: 0 off, 1 Static, 2 SingleOn, 3 SingleOff, 4 Glittering,
 - `PROTOCOL.md`: protocol notes
 
 Not affiliated with Ragnok. Use at your own risk.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The software is provided as is, with no warranty.
+This tool changes settings stored on the keyboard, and you use it at your own risk.
+
+The license does not cover `extracted/rk104_layout.xml`, which comes from the
+vendor software.
