@@ -112,15 +112,16 @@ Split-board keys (tested on hardware 2026-11-02): the two B keys share
 light_index 78 and key_index 78, and the two Space keys share 94. They light
 together and the keyboard reports them as the same key, so they cannot be set
 separately. Indices not listed in the layout XML (14-18, 35, 36, 53, 54, 71,
-72, 89, 90, 107-111, 114, 124-142) have no LED.
+72, 89, 90, 107-111, 114, 124-142) have no LED. A keymap probe that sent a
+unique key from each of them produced nothing from either B or either Space.
 
 Volume roller (tested on hardware 2026-11-03): pressing the roller is
 **key_index 16**, which is missing from the vendor XML. A keymap-probe entry at
-index 16 typed its probe letter when the roller was pressed, so the press can
-be remapped like any key. Turning the roller is assumed to be handled by the
-firmware and not part of the keymap; that assumes rotation still changed the
-volume during the probe. The roller has no LED. A keymap probe that sent a
-unique key from each of them produced nothing from either B or either Space.
+index 16 typed its probe letter when the roller was pressed. Remapping the
+press with the GUI was **confirmed working** on the keyboard. Turning the roller
+is assumed to be handled by the firmware and not part of the keymap; that
+assumes rotation still changed the volume during the probe. The roller has no
+LED.
 
 ### 0x20: real-time / direct LED stream (not saved)
 Builder: 0x427fe0 (also 0x432990). This is what the app uses for music mode and
