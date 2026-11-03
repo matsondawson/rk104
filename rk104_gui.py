@@ -29,7 +29,7 @@ LABELS = {
     "end": "End", "page down": "PgDn", "CapsLock": "Caps", ":;": ":\n;", "\"'": "\"\n'",
     "Shift_L": "Shift", "Shift_R": "Shift", ",<": "<\n,", ".>": ">\n.", "/?": "?\n/",
     "Ctrl_L": "Ctrl", "Ctrl_R": "Ctrl", "Win_L": "Win", "Alt_L": "Alt", "Alt_R": "Alt",
-    "APP": "Menu",
+    "APP": "Menu", "Roller": "Vol\n●",
 }
 # Split-board keys that the XML stores as one rect spanning the gap:
 # name -> list of (x, w) halves. Both halves share one LED.
@@ -143,7 +143,7 @@ class KeyboardView(QWidget):
         font = p.font()
         off = QColor(44, 44, 50)
         for k in self.keys:
-            c = QColor(self.colors[k.light_index])
+            c = QColor(self.colors[k.light_index]) if k.light_index > 0 else QColor(0, 0, 0)
             lit = (c.red() or c.green() or c.blue()) and not self.mapping_mode
             remap = self.overlay.get(k.light_index) if self.mapping_mode else None
             fill = c if lit else off
@@ -247,7 +247,7 @@ class KeyboardView(QWidget):
         self.update()
 
     def _paint(self, k):
-        if k and k.light_index not in self._painted:
+        if k and k.light_index > 0 and k.light_index not in self._painted:
             self._painted.add(k.light_index)
             self.colors[k.light_index] = QColor(self.brush)
             self.update()
@@ -255,7 +255,7 @@ class KeyboardView(QWidget):
 
     # editing API ---------------------------------------------------------------
     def fill(self, color, only_selected=False):
-        targets = self.selected if only_selected else self.colors.keys()
+        targets = [li for li in (self.selected if only_selected else self.colors) if li > 0]
         for li in targets:
             self.colors[li] = QColor(color)
         self.update()
@@ -715,6 +715,9 @@ def main():
     rules = os.environ.get("QT_LOGGING_RULES", "")
     os.environ["QT_LOGGING_RULES"] = ";".join(filter(None, [rules, "qt.qpa.wayland.textinput=false"]))
     app = QApplication(sys.argv)
+    # Wayland app_id / X11 WM_CLASS, so window-manager rules can match "rk104".
+    app.setApplicationName("rk104")
+    app.setDesktopFileName("rk104")
     import argparse
     ap = argparse.ArgumentParser(description="RK104 lighting / key mapping GUI")
     ap.add_argument("--dry-run", action="store_true", help="print packets instead of sending")

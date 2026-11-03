@@ -87,15 +87,24 @@ class Key:
     h: int
 
 
+# Keys missing from the vendor layout XML, found by probing the hardware.
+# light_index 0 = no LED (never sent in colour tables).
+EXTRA_KEYS = [
+    # Volume roller: pressing it is key_index 16 (found with keymap-probe).
+    # Turning it is handled by the firmware and is not in the keymap.
+    Key("Roller", 0, 16, 0, 765, 46, 26, 26),
+]
+
+
 def load_layout(path=LAYOUT):
-    """Return list of Key in the 800x300 coordinate space of assets/keyboard.png."""
+    """Return list of Key in the layout coordinate space (vendor XML + EXTRA_KEYS)."""
     root = ET.parse(path).getroot()
     out = []
     for k in root.iter("key"):
         out.append(Key(k.get("name"), int(k.get("code"), 16), int(k.get("key_index")),
                        int(k.get("light_index")), int(k.get("rect_left")), int(k.get("rect_top")),
                        int(k.get("rect_width")), int(k.get("rect_height"))))
-    return out
+    return out + EXTRA_KEYS
 
 
 class RK104:
